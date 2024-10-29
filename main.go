@@ -4,18 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/signal"
+	"strconv"
+	"time"
+
 	"github.com/KittenConnect/rh-api/model"
 	"github.com/KittenConnect/rh-api/util"
 	"github.com/joho/godotenv"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"os"
-	"strconv"
-	"time"
 )
 
 func failWithError(err error, formatString string, args ...any) {
 	if err != nil {
-		util.Err(fmt.Errorf(fmt.Sprintf("%s: %w",formatString), append(args, err)...).Error())
+		util.Err(fmt.Errorf(fmt.Sprintf("%s: %w", formatString), append(args, err)...).Error())
 	}
 }
 
@@ -107,8 +109,18 @@ func main() {
 		os.Exit(-1)
 	}
 
+	// cancel context for whole conde
+	foreverCtx, foreverCancel := context.WithCancel(context.Background())
+
 	// Canal pour signaler la fin du programme
-	forever := make(chan bool)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt)
+	// catch signal
+	go func() {
+		<-sigs
+		fmt.Printf("You pressed ctrl + C. User interrupted infinite loop.")
+		foreverCancel()
+	}()
 
 	go func() {
 		for d := range msgs {
@@ -191,8 +203,10 @@ func main() {
 				}
 			}()
 		}
+		util.Info("End of queue reaches exit now !")
+		foreverCancel()
 	}()
 
 	util.Info(" [*] Waiting for messages. To exit press CTRL+C")
-	<-forever
+	<-foreverCtx.Done()
 }
