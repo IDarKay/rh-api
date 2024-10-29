@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"time"
 
 	"github.com/KittenConnect/rh-api/model"
 	"github.com/KittenConnect/rh-api/util"
@@ -137,10 +136,6 @@ func main() {
 				if err != nil {
 					util.Warn("error creating or updating VM : %w", err)
 
-					dur, _ := time.ParseDuration("10s")
-					ctx, cancel := context.WithTimeout(context.Background(), dur)
-					defer cancel()
-
 					newMsg := msg
 					newMsg.FailCount--
 
@@ -154,8 +149,7 @@ func main() {
 						"x-delay": RETRY_DELAY * 1000,
 					}
 
-					chErr := ch.PublishWithContext(
-						ctx,
+					chErr := ch.Publish(
 						incomingQueue,
 						inQ.Name,
 						false,
@@ -177,16 +171,11 @@ func main() {
 
 				util.Success("VM %s is up to date", msg.Hostname)
 
-				dur, _ := time.ParseDuration("10s")
-				ctx, cancel := context.WithTimeout(context.Background(), dur)
-				defer cancel()
-
 				newMsg := msg
 
 				newMsgJson, _ := json.Marshal(newMsg)
 
-				chErr := ch.PublishWithContext(
-					ctx,
+				chErr := ch.Publish(
 					"",
 					outQ.Name,
 					false,
