@@ -36,9 +36,11 @@ func NewVM(n *Netbox, msg Message) *VirtualMachine {
 	return vm
 }
 
-func (vm *VirtualMachine) Get() models.WritableVirtualMachineWithConfigContext {
+// dev chnage name ?
+// Get: return tableVirtualMachineWithConfigContext for vm
+func (vm *VirtualMachine) Get() *models.WritableVirtualMachineWithConfigContext {
 	// todo: implement netbox func
-	return models.WritableVirtualMachineWithConfigContext{
+	return &models.WritableVirtualMachineWithConfigContext{
 		Cluster: &vm.Cluster.ID,
 		Name:    &vm.Name,
 		Status:  vm.Status,
@@ -50,17 +52,7 @@ func (vm *VirtualMachine) Get() models.WritableVirtualMachineWithConfigContext {
 }
 
 func (vm *VirtualMachine) Create(msg Message) (*virtualization.VirtualizationVirtualMachinesCreateCreated, error) {
-	conf := models.WritableVirtualMachineWithConfigContext{
-		Cluster: &vm.Cluster.ID,
-		Name:    &vm.Name,
-		Status:  vm.Status,
-
-		CustomFields: map[string]interface{}{
-			"kc_serial_": msg.GetSerial(),
-		},
-	}
-
-	params := virtualization.NewVirtualizationVirtualMachinesCreateParams().WithData(&conf)
+	params := virtualization.NewVirtualizationVirtualMachinesCreateParams().WithData(vm.Get())
 	return vm.n.Client.Virtualization.VirtualizationVirtualMachinesCreate(params, nil)
 }
 
@@ -70,10 +62,8 @@ func (vm *VirtualMachine) CreateOrUpdate(msg Message) {
 
 // Update vm infos to netbox
 func (vm *VirtualMachine) Update() error {
-	data := vm.Get()
-
 	updateParams := &virtualization.VirtualizationVirtualMachinesPartialUpdateParams{
-		Data: &data,
+		Data: vm.Get(),
 		ID:   vm.NetboxId,
 	}
 

@@ -4,18 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/signal"
+	"strconv"
+
 	"github.com/KittenConnect/rh-api/model"
 	"github.com/KittenConnect/rh-api/util"
 	"github.com/joho/godotenv"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"os"
-	"strconv"
-	"time"
 )
 
 func failWithError(err error, formatString string, args ...any) {
 	if err != nil {
-		util.Err(fmt.Errorf(fmt.Sprintf("%s: %w",formatString), append(args, err)...).Error())
+		util.Err(fmt.Errorf(fmt.Sprintf("%s: %w", formatString), append(args, err)...).Error())
 	}
 }
 
@@ -107,8 +108,18 @@ func main() {
 		os.Exit(-1)
 	}
 
+	// cancel context for whole conde
+	foreverCtx, foreverCancel := context.WithCancel(context.Background())
+
 	// Canal pour signaler la fin du programme
-	forever := make(chan bool)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt)
+	// catch signal
+	go func() {
+		<-sigs
+		fmt.Printf("You pressed ctrl + C. User interrupted infinite loop.")
+		foreverCancel()
+	}()
 
 	go func() {
 		for d := range msgs {
@@ -125,10 +136,6 @@ func main() {
 				if err != nil {
 					util.Warn("error creating or updating VM : %w", err)
 
-					dur, _ := time.ParseDuration("10s")
-					ctx, cancel := context.WithTimeout(context.Background(), dur)
-					defer cancel()
-
 					newMsg := msg
 					newMsg.FailCount--
 
@@ -142,8 +149,7 @@ func main() {
 						"x-delay": RETRY_DELAY * 1000,
 					}
 
-					chErr := ch.PublishWithContext(
-						ctx,
+					chErr := ch.Publish(
 						incomingQueue,
 						inQ.Name,
 						false,
@@ -165,16 +171,11 @@ func main() {
 
 				util.Success("VM %s is up to date", msg.Hostname)
 
-				dur, _ := time.ParseDuration("10s")
-				ctx, cancel := context.WithTimeout(context.Background(), dur)
-				defer cancel()
-
 				newMsg := msg
 
 				newMsgJson, _ := json.Marshal(newMsg)
 
-				chErr := ch.PublishWithContext(
-					ctx,
+				chErr := ch.Publish(
 					"",
 					outQ.Name,
 					false,
@@ -191,8 +192,10 @@ func main() {
 				}
 			}()
 		}
+		util.Info("End of queue reaches exit now !")
+		foreverCancel()
 	}()
 
 	util.Info(" [*] Waiting for messages. To exit press CTRL+C")
-	<-forever
+	<-foreverCtx.Done()
 }
