@@ -27,7 +27,7 @@ type Netbox struct {
 }
 
 // NewNetbox return a fresh Netbox object
-func NewNetbox() Netbox {
+func NewNetbox() *Netbox {
 	nbx := Netbox{
 		ctx:    context.Background(),
 		Client: nil,
@@ -35,7 +35,7 @@ func NewNetbox() Netbox {
 		_isConnected: false,
 	}
 
-	return nbx
+	return &nbx
 }
 
 func (n *Netbox) IsConnected() bool {
@@ -54,7 +54,7 @@ func (n *Netbox) Connect() error {
 }
 
 func (n *Netbox) GetDefaultTimeout() time.Duration {
-	return time.Duration(30) * time.Second
+	return 30 * time.Second
 }
 
 func (n *Netbox) getIpAddress(ip string) *models.WritableIPAddress {
